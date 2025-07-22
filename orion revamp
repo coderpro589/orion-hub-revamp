@@ -1100,19 +1100,28 @@ function OrionLib:MakeWindow(WindowConfig)
 				end
 				return Slider
 			end    
-			function ElementFunction:AddDropdown(DropdownConfig)
+				function ElementFunction:AddDropdown(DropdownConfig)
 				DropdownConfig = DropdownConfig or {}
 				DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
 				DropdownConfig.Options = DropdownConfig.Options or {}
-				DropdownConfig.Default = DropdownConfig.Default or ""
+				DropdownConfig.MultiSelect = DropdownConfig.MultiSelect or false -- New option for multi-selection
+				DropdownConfig.Default = DropdownConfig.Default or (DropdownConfig.MultiSelect and {} or "") -- Default to a table for multi-select
 				DropdownConfig.Callback = DropdownConfig.Callback or function() end
 				DropdownConfig.Flag = DropdownConfig.Flag or nil
 				DropdownConfig.Save = DropdownConfig.Save or false
 
-				local Dropdown = {Value = DropdownConfig.Default, Options = DropdownConfig.Options, Buttons = {}, Toggled = false, Type = "Dropdown", Save = DropdownConfig.Save}
+				local Dropdown = {
+					Value = DropdownConfig.Default, 
+					Options = DropdownConfig.Options, 
+					Buttons = {}, 
+					Toggled = false, 
+					Type = "Dropdown", 
+					Save = DropdownConfig.Save,
+					MultiSelect = DropdownConfig.MultiSelect
+				}
 				local MaxElements = 5
 
-				if not table.find(Dropdown.Options, Dropdown.Value) then
+				if not Dropdown.MultiSelect and not table.find(Dropdown.Options, Dropdown.Value) then
 					Dropdown.Value = "..."
 				end
 
@@ -1177,6 +1186,17 @@ function OrionLib:MakeWindow(WindowConfig)
 					DropdownContainer.CanvasSize = UDim2.new(0, 0, 0, DropdownList.AbsoluteContentSize.Y)
 				end)  
 
+				local function ToggleDropdown(state)
+					Dropdown.Toggled = state
+					DropdownFrame.F.Line.Visible = Dropdown.Toggled
+					TweenService:Create(DropdownFrame.F.Ico,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Rotation = Dropdown.Toggled and 180 or 0}):Play()
+					if #Dropdown.Options > MaxElements then
+						TweenService:Create(DropdownFrame,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Size = Dropdown.Toggled and UDim2.new(1, 0, 0, 38 + (MaxElements * 28)) or UDim2.new(1, 0, 0, 38)}):Play()
+					else
+						TweenService:Create(DropdownFrame,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Size = Dropdown.Toggled and UDim2.new(1, 0, 0, DropdownList.AbsoluteContentSize.Y + 38) or UDim2.new(1, 0, 0, 38)}):Play()
+					end
+				end
+
 				local function AddOptions(Options)
 					for _, Option in pairs(Options) do
 						local OptionBtn = AddThemeObject(SetProps(SetChildren(MakeElement("Button", Color3.fromRGB(40, 40, 40)), {
@@ -1194,7 +1214,18 @@ function OrionLib:MakeWindow(WindowConfig)
 						}), "Divider")
 
 						AddConnection(OptionBtn.MouseButton1Click, function()
-							Dropdown:Set(Option)
+							if Dropdown.MultiSelect then
+								local isSelected = table.find(Dropdown.Value, Option)
+								if isSelected then
+									table.remove(Dropdown.Value, isSelected)
+								else
+									table.insert(Dropdown.Value, Option)
+								end
+								Dropdown:Set(Dropdown.Value) -- Update visuals and callback
+							else
+								Dropdown:Set(Option)
+								ToggleDropdown(false) -- Close dropdown on selection for single-select mode
+							end
 							SaveCfg(game.GameId)
 						end)
 
@@ -1215,37 +1246,46 @@ function OrionLib:MakeWindow(WindowConfig)
 				end  
 
 				function Dropdown:Set(Value)
-					if not table.find(Dropdown.Options, Value) then
-						Dropdown.Value = "..."
-						DropdownFrame.F.Selected.Text = Dropdown.Value
-						for _, v in pairs(Dropdown.Buttons) do
-							TweenService:Create(v,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundTransparency = 1}):Play()
-							TweenService:Create(v.Title,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{TextTransparency = 0.4}):Play()
-						end	
-						return
+					-- Reset all button visuals first
+					for _, btn in pairs(Dropdown.Buttons) do
+						TweenService:Create(btn,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundTransparency = 1}):Play()
+						TweenService:Create(btn.Title,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{TextTransparency = 0.4}):Play()
 					end
+					
+					if self.MultiSelect then
+						-- Handle multi-selection (Value is a table)
+						self.Value = Value or {}
+						for _, optionName in ipairs(self.Value) do
+							if self.Buttons[optionName] then
+								local btn = self.Buttons[optionName]
+								TweenService:Create(btn,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundTransparency = 0}):Play()
+								TweenService:Create(btn.Title,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{TextTransparency = 0}):Play()
+							end
+						end
+						DropdownFrame.F.Selected.Text = #self.Value .. " Selected"
+						DropdownConfig.Callback(self.Value)
+					else
+						-- Handle single-selection (Value is a string)
+						if not table.find(self.Options, Value) then
+							self.Value = "..."
+							DropdownFrame.F.Selected.Text = self.Value
+							return
+						end
 
-					Dropdown.Value = Value
-					DropdownFrame.F.Selected.Text = Dropdown.Value
-
-					for _, v in pairs(Dropdown.Buttons) do
-						TweenService:Create(v,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundTransparency = 1}):Play()
-						TweenService:Create(v.Title,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{TextTransparency = 0.4}):Play()
-					end	
-					TweenService:Create(Dropdown.Buttons[Value],TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundTransparency = 0}):Play()
-					TweenService:Create(Dropdown.Buttons[Value].Title,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{TextTransparency = 0}):Play()
-					return DropdownConfig.Callback(Dropdown.Value)
+						self.Value = Value
+						DropdownFrame.F.Selected.Text = self.Value
+						
+						if self.Buttons[Value] then
+							local btn = self.Buttons[Value]
+							TweenService:Create(btn,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundTransparency = 0}):Play()
+							TweenService:Create(btn.Title,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{TextTransparency = 0}):Play()
+						end
+						DropdownConfig.Callback(self.Value)
+					end
 				end
 
 				AddConnection(Click.MouseButton1Click, function()
-					Dropdown.Toggled = not Dropdown.Toggled
-					DropdownFrame.F.Line.Visible = Dropdown.Toggled
-					TweenService:Create(DropdownFrame.F.Ico,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Rotation = Dropdown.Toggled and 180 or 0}):Play()
-					if #Dropdown.Options > MaxElements then
-						TweenService:Create(DropdownFrame,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Size = Dropdown.Toggled and UDim2.new(1, 0, 0, 38 + (MaxElements * 28)) or UDim2.new(1, 0, 0, 38)}):Play()
-					else
-						TweenService:Create(DropdownFrame,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Size = Dropdown.Toggled and UDim2.new(1, 0, 0, DropdownList.AbsoluteContentSize.Y + 38) or UDim2.new(1, 0, 0, 38)}):Play()
-					end
+					ToggleDropdown(not Dropdown.Toggled)
 				end)
 
 				Dropdown:Refresh(Dropdown.Options, false)
