@@ -991,6 +991,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end	
 				return Toggle
 			end  
+			-- Replace the entire AddSlider function with this block
 			function ElementFunction:AddSlider(SliderConfig)
 				SliderConfig = SliderConfig or {}
 				SliderConfig.Name = SliderConfig.Name or "Slider"
@@ -1040,7 +1041,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				})
 
 				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 4), {
-					Size = UDim2.new(1, 0, 0, 65), -- This size MUST remain constant to prevent alignment issues.
+					Size = UDim2.new(1, 0, 0, 65),
 					Parent = ItemParent
 				}), {
 					AddThemeObject(SetProps(MakeElement("Label", SliderConfig.Name, 15), {
@@ -1061,36 +1062,31 @@ function OrionLib:MakeWindow(WindowConfig)
 					SliderDrag.Value.Text = tostring(self.Value) .. " " .. SliderConfig.ValueName
 					SliderConfig.Callback(self.Value)
 				end   
-				
-				-- Handle the start of a drag (both mouse and touch)
+
+				local function UpdateSlider(inputPos)
+					local pos = inputPos.X - SliderBar.AbsolutePosition.X
+					local size = SliderBar.AbsoluteSize.X
+					local percentage = math.clamp(pos / size, 0, 1)
+					Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * percentage))
+				end
+
 				SliderBar.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						Dragging = true 
-						-- Immediately move the slider to the clicked/tapped position
-						local pos = Input.Position.X - SliderBar.AbsolutePosition.X
-						local size = SliderBar.AbsoluteSize.X
-						local percentage = math.clamp(pos / size, 0, 1)
-						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * percentage))
-					end 
-				end)
-				
-				-- Handle the end of a drag
-				SliderBar.InputEnded:Connect(function(Input) 
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						Dragging = false 
-						-- Save the config only when the user lets go, which is more efficient
-						SaveCfg(game.GameId)
-					end 
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+						Dragging = true
+						UpdateSlider(Input.Position)
+					end
 				end)
 
-				-- Handle the drag movement
+				SliderBar.InputEnded:Connect(function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+						Dragging = false
+						SaveCfg(game.GameId)
+					end
+				end)
+
 				UserInputService.InputChanged:Connect(function(Input)
-					-- Check if we are dragging and the input is either mouse movement or a touch drag
-					if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then 
-						local pos = Input.Position.X - SliderBar.AbsolutePosition.X
-						local size = SliderBar.AbsoluteSize.X
-						local percentage = math.clamp(pos / size, 0, 1)
-						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * percentage))
+					if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
+						UpdateSlider(Input.Position)
 					end
 				end)
 
