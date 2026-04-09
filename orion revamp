@@ -360,7 +360,6 @@ CreateElement("Label", function(Text, TextSize, Transparency)
 		TextColor3 = Color3.fromRGB(240, 240, 240),
 		TextTransparency = Transparency or 0,
 		TextSize = TextSize or 15,
-		TextScaled = true,
 		Font = Enum.Font.SourceSans,
 		RichText = true,
 		BackgroundTransparency = 1,
