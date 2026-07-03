@@ -486,6 +486,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 	end
 
+	local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
 	local TabHolder = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 4), {
 		Size = UDim2.new(1, 0, 1, -50)
 	}), {
@@ -635,6 +637,9 @@ function OrionLib:MakeWindow(WindowConfig)
 	AddDraggingFunctionality(DragPoint, MainWindow)
 
 	AddConnection(CloseBtn.MouseButton1Up, function()
+		if IsMobile then
+			return
+		end
 		MainWindow.Visible = false
 		UIHidden = true
 		OrionLib:MakeNotification({
